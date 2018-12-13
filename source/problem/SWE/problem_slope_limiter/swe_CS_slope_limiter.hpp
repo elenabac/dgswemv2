@@ -2,6 +2,7 @@
 #define SWE_CS_SL_HPP
 
 // Implementation of Cockburn-Shu slope limiter
+#include "problem/SWE/problem_jacobian/swe_jacobian.hpp"
 
 namespace SWE {
 template <typename StepperType, typename ElementType>
@@ -12,7 +13,7 @@ void slope_limiting_prepare_element_kernel(const StepperType& stepper, ElementTy
     if (wd_state.wet) {
         const uint stage = stepper.GetStage();
 
-        auto& state = elt.data.state[stage + 1];
+        auto& state = elt.data.state[stage];
 
         sl_state.q_lin        = elt.ProjectBasisToLinear(state.q);
         sl_state.q_at_baryctr = elt.ComputeLinearUbaryctr(sl_state.q_lin);
@@ -102,63 +103,60 @@ void slope_limiting_kernel(const StepperType& stepper, ElementType& elt) {
         std::find(sl_state.wet_neigh.begin(), sl_state.wet_neigh.end(), false) == sl_state.wet_neigh.end()) {
         const uint stage = stepper.GetStage();
 
-        auto& state = elt.data.state[stage + 1];
+        auto& state = elt.data.state[stage];
 
-        double u = sl_state.q_at_baryctr[SWE::Variables::qx] /
-                   (sl_state.q_at_baryctr[SWE::Variables::ze] + sl_state.bath_at_baryctr);
-        double v = sl_state.q_at_baryctr[SWE::Variables::qy] /
-                   (sl_state.q_at_baryctr[SWE::Variables::ze] + sl_state.bath_at_baryctr);
-        double c = std::sqrt(Global::g * (sl_state.q_at_baryctr[SWE::Variables::ze] + sl_state.bath_at_baryctr));
+        StatMatrix<double, SWE::n_variables, SWE::n_variables> R;
+        StatMatrix<double, SWE::n_variables, SWE::n_variables> invR;
+
+        StatVector<double, SWE::n_variables> w_midpt_char;
+        StatVector<double, SWE::n_variables> w_baryctr_char_0;
+        StatVector<double, SWE::n_variables> w_baryctr_char_1;
+        StatVector<double, SWE::n_variables> w_baryctr_char_2;
+
+        StatVector<double, SWE::n_variables> w_tilda;
+        StatVector<double, SWE::n_variables> w_delta;
+        StatVector<double, SWE::n_variables> delta_char;
+
+        double h = sl_state.q_at_baryctr[SWE::Variables::ze] + sl_state.bath_at_baryctr;
+        double u = sl_state.q_at_baryctr[SWE::Variables::qx] / h;
+        double v = sl_state.q_at_baryctr[SWE::Variables::qy] / h;
 
         for (uint bound = 0; bound < elt.data.get_nbound(); ++bound) {
             uint element_1 = bound;
             uint element_2 = (bound + 1) % 3;
 
-            sl_state.R(0, 0) = 1.0;
-            sl_state.R(1, 0) = u + c * sl_state.surface_normal[bound][GlobalCoord::x];
-            sl_state.R(2, 0) = v + c * sl_state.surface_normal[bound][GlobalCoord::y];
+            double nx = sl_state.surface_normal[bound][GlobalCoord::x];
+            double ny = sl_state.surface_normal[bound][GlobalCoord::y];
 
-            sl_state.R(0, 1) = 0.0;
-            sl_state.R(1, 1) = -sl_state.surface_normal[bound][GlobalCoord::y];
-            sl_state.R(2, 1) = sl_state.surface_normal[bound][GlobalCoord::x];
+            R    = SWE::R(h, u, v, nx, ny);
+            invR = SWE::invR(h, u, v, nx, ny);
 
-            sl_state.R(0, 2) = 1.0;
-            sl_state.R(1, 2) = u - c * sl_state.surface_normal[bound][GlobalCoord::x];
-            sl_state.R(2, 2) = v - c * sl_state.surface_normal[bound][GlobalCoord::y];
+            w_midpt_char     = invR * column(sl_state.q_at_midpts, bound);
+            w_baryctr_char_0 = invR * sl_state.q_at_baryctr;
+            w_baryctr_char_1 = invR * sl_state.q_at_baryctr_neigh[element_1];
+            w_baryctr_char_2 = invR * sl_state.q_at_baryctr_neigh[element_2];
 
-            sl_state.L = inverse(sl_state.R);
+            w_tilda = w_midpt_char - w_baryctr_char_0;
 
-            sl_state.w_midpt_char = sl_state.L * column(sl_state.q_at_midpts, bound);
+            w_delta = sl_state.alpha_1[bound] * (w_baryctr_char_1 - w_baryctr_char_0) +
+                      sl_state.alpha_2[bound] * (w_baryctr_char_2 - w_baryctr_char_0);
 
-            column(sl_state.w_baryctr_char, 0) = sl_state.L * sl_state.q_at_baryctr;
-            column(sl_state.w_baryctr_char, 1) = sl_state.L * sl_state.q_at_baryctr_neigh[element_1];
-            column(sl_state.w_baryctr_char, 2) = sl_state.L * sl_state.q_at_baryctr_neigh[element_2];
-
-            double w_tilda;
-            double w_delta;
-
-            for (uint var = 0; var < 3; var++) {
-                w_tilda = sl_state.w_midpt_char[var] - sl_state.w_baryctr_char(var, 0);
-
-                w_delta =
-                    sl_state.alpha_1[bound] * (sl_state.w_baryctr_char(var, 1) - sl_state.w_baryctr_char(var, 0)) +
-                    sl_state.alpha_2[bound] * (sl_state.w_baryctr_char(var, 2) - sl_state.w_baryctr_char(var, 0));
-
+            for (uint var = 0; var < SWE::n_variables; ++var) {
                 // TVB modified minmod
-                if (std::abs(w_tilda) <= PostProcessing::M * sl_state.r_sq[bound]) {
-                    sl_state.delta_char[var] = w_tilda;
-                } else if (std::signbit(w_tilda) == std::signbit(w_delta)) {
-                    sl_state.delta_char[var] = std::copysign(1.0, w_tilda) *
-                                               std::min(std::abs(w_tilda), std::abs(PostProcessing::nu * w_delta));
+                if (std::abs(w_tilda[var]) <= PostProcessing::M * sl_state.r_sq[bound]) {
+                    delta_char[var] = w_tilda[var];
+                } else if (std::signbit(w_tilda[var]) == std::signbit(w_delta[var])) {
+                    delta_char[var] = std::copysign(1.0, w_tilda[var]) *
+                                      std::min(std::abs(w_tilda[var]), std::abs(PostProcessing::nu * w_delta[var]));
                 } else {
-                    sl_state.delta_char[var] = 0.0;
+                    delta_char[var] = 0.0;
                 }
             }
 
-            column(sl_state.delta, bound) = sl_state.R * sl_state.delta_char;
+            column(sl_state.delta, bound) = R * delta_char;
         }
 
-        for (uint var = 0; var < 3; var++) {
+        for (uint var = 0; var < SWE::n_variables; ++var) {
             double delta_sum = 0.0;
 
             for (uint bound = 0; bound < elt.data.get_nbound(); ++bound) {
@@ -184,37 +182,25 @@ void slope_limiting_kernel(const StepperType& stepper, ElementType& elt) {
             }
         }
 
+        for (uint vrtx = 0; vrtx < elt.data.get_nvrtx(); ++vrtx) {
+            column(sl_state.q_at_vrtx, vrtx) = sl_state.q_at_baryctr;
+        }
+
         StatMatrix<double, SWE::n_variables, SWE::n_variables> T;
-
         set_constant(T, 1.0);
-
         T(0, 0) = -1.0;
         T(1, 1) = -1.0;
         T(2, 2) = -1.0;
 
-        for (uint vrtx = 0; vrtx < 3; ++vrtx) {
-            column(sl_state.q_at_vrtx, vrtx) = sl_state.q_at_baryctr;
+        sl_state.q_at_vrtx += sl_state.delta * T;
 
-            for (uint bound = 0; bound < elt.data.get_nbound(); ++bound) {
-                sl_state.q_at_vrtx(SWE::Variables::ze, vrtx) += T(vrtx, bound) * sl_state.delta(0, bound);
-                sl_state.q_at_vrtx(SWE::Variables::qx, vrtx) += T(vrtx, bound) * sl_state.delta(1, bound);
-                sl_state.q_at_vrtx(SWE::Variables::qy, vrtx) += T(vrtx, bound) * sl_state.delta(2, bound);
+        for (uint var = 0; var < SWE::n_variables; ++var) {
+            double del_q_norm = norm(row(sl_state.q_at_vrtx, var) - row(sl_state.q_lin, var));
+            double q_norm     = norm(row(sl_state.q_lin, var));
+
+            if (del_q_norm / q_norm > 1.0e-12) {
+                row(state.q, var) = elt.ProjectLinearToBasis(elt.data.get_ndof(), row(sl_state.q_at_vrtx, var));
             }
-        }
-
-        bool limit = false;
-
-        for (uint vrtx = 0; vrtx < 3; ++vrtx) {
-            double del_q_norm = norm(column(sl_state.q_at_vrtx, vrtx) - column(sl_state.q_lin, vrtx));
-            double q_norm     = norm(column(sl_state.q_lin, vrtx));
-
-            if (del_q_norm / q_norm > 1.0e-6) {
-                limit = true;
-            }
-        }
-
-        if (limit) {
-            state.q = elt.ProjectLinearToBasis(elt.data.get_ndof(), sl_state.q_at_vrtx);
         }
     }
 }

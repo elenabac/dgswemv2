@@ -19,7 +19,7 @@ inline StatVector<double, SWE::n_variables> ic_q(const double t, const Point<2>&
     double bathymetry = - alpha * r2;
     double water_column_height = 1/(X+ Y) + alpha*(Y*Y - X*X)*r2/((X+Y)*(X+Y));
 
-    //Note that the solution is non-zero for
+    // Note that the solution is non-zero for
     // r < sqrt( (X+Y)/(alpha*(X*X - Y*Y)))
     // However, the initialization will check for negative water column height
     // and correct it.
