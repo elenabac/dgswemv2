@@ -1,0 +1,37 @@
+###############################################################################
+#
+#  DGSWEMv2 input file
+#
+###############################################################################
+
+mesh:
+  format: Adcirc
+  file_name: input_files/fort.14
+  coordinate_system: cartesian
+
+timestepping:
+  start_time: 11-05-2015 12:00              #dd-mm-yyyy hh:mm
+  end_time: 13-05-2015 12:00                #dd-mm-yyyy hh:mm
+  dt: 1                           #in seconds
+  order: 2
+  nstages: 2
+  ramp_duration: 0.5
+
+polynomial_order: 1
+
+problem:
+  name: rkdg_swe
+  gravity: 9.81
+  density_air: 1.225
+  density_water: 1000.0
+  h_o: 0.01
+  initial_conditions:
+    type: Constant
+    initial_surface_height: 0.0
+    initial_momentum_x: 0.0
+    initial_momentum_y: 0.0
+
+output:
+  path: input_files/output/
+  vtu:
+    frequency: 1

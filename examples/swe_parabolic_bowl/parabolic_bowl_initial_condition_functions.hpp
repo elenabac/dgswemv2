@@ -12,11 +12,12 @@ inline StatVector<double, SWE::n_variables> ic_q(const double t, const Point<2>&
     constexpr double alpha = 1.e-7;
     constexpr double X = 1;
     constexpr double Y = -0.41884;
-    const double tau = 2*PI/(8*Global::g*alpha);
+    const double w = sqrt(8*Global::g*alpha);
+    const double tau = 2*PI/w;
 
     double r2 = x*x + y*y;
     double bathymetry = - alpha * r2;
-    double water_column_height = 1/(X+ Y) + alpha*(Y*Y - X*X)/((X+Y)*(X+Y))*r2;
+    double water_column_height = 1/(X+ Y) + alpha*(Y*Y - X*X)*r2/((X+Y)*(X+Y));
 
     //Note that the solution is non-zero for
     // r < sqrt( (X+Y)/(alpha*(X*X - Y*Y)))
