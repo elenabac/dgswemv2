@@ -11,8 +11,8 @@ mesh:
 
 timestepping:
   start_time: 25-11-1987 00:00:00                
-  end_time: 25-11-1987 00:00:01                
-  dt: 0.001                          
+  end_time: 25-11-1987 01:00:00                
+  dt: 5.00                          
   order: 2
   nstages: 2
 
@@ -26,3 +26,8 @@ problem:
   initial_conditions:
     type: Function
   function_source: Enable
+
+output:
+  path: output/
+  vtk:
+    frequency: 60

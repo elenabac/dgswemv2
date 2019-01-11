@@ -1,6 +1,14 @@
-BUILD_TYPE=Release
-MACHINE=stampede2-knl
+BUILD_TYPE=Debug
+#MACHINE=ices-desktop
 #VERBOSE=true
+
+echo "using ices-desktop"
+NUM_BUILDCORES=4
+CMAKE="/usr/bin/cmake"
+
+WORK=/home/bachini/C++
+
+
 
 if [ "$MACHINE" == "ices-desktop" ]; then
    echo "using ices-desktop"

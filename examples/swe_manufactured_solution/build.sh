@@ -61,7 +61,8 @@ make_swe_manufactured_solution() {
 	cp ${MANSOL_DIR}/manufactured_swe_source_functions.hpp ${SWE_DIR}/swe_source_functions.hpp
 
 	MAIN_DIR="${DGSWEMV2_DIR}/source/"
-
+	cp ${MAIN_DIR}/dgswemv2-${TARGET}.cpp ${MAIN_DIR}/dgswemv2-${TARGET}.cpp.tmp
+	
 	if [ "${TARGET}" == "serial" ]; then
 	    sed -i.tmp '/return 0/i\
 	    simulation->ComputeL2Residual();' ${MAIN_DIR}/dgswemv2-serial.cpp

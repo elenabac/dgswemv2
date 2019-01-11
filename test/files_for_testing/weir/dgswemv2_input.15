@@ -27,3 +27,8 @@ problem:
     type: Cockburn-Shu
     M: 1.0e-8
     nu: 1.5
+
+output:
+  path: output/
+  vtu:
+    frequency: 10.

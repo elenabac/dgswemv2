@@ -1,12 +1,17 @@
 #!/bin/bash
 
-# This is a walk through of the dgswemv2 workflow.
-# This script recreates the parabolic bowl solution in:
-#  Bunya et al., "A Wetting and Drying Treatment for the Runge-Kutta Discontinuous
-#  Galerkin Solution to the Shallow Water Equations", CMAME (2009).
+DGSWEMV2_ROOT=/home/bachini/C++/dgswemv2
+DGSWEMV2_BUILD_DIR=$DGSWEMV2_ROOT/build
 
-#Throughout the simulation, we will rely on the following environment variables.
-# DGSWEMV2_ROOT should be set to the dgswemv2 repository path.
+# This is a walk through of the dgswemv2 workflow.  This script
+# recreates the parabolic bowl solution in:
+# Bunya et al., "A Wetting
+# and Drying Treatment for the Runge-Kutta Discontinuous Galerkin
+# Solution to the Shallow Water Equations", CMAME (2009).
+
+# Throughout the simulation, we will rely on the following environment
+# variables.  DGSWEMV2_ROOT should be set to the dgswemv2 repository
+# path.
 if [[ ! -d $DGSWEMV2_ROOT ]]; then
     echo "Error: Could not find DGSWEMV2_ROOT: ${DGSWEMV2_ROOT}"
     echo "       Please set the environment variable DGSWEMV2_ROOT to point at the"
@@ -44,41 +49,22 @@ fi
 PARABOLIC_BOWL_DIR=$DGSWEMV2_ROOT_/examples/swe_parabolic_bowl
 
 ###################################################################################
-echo "Entering Mesh Generation"
-###################################################################################
-
-#To begin, we need to generate the desired mesh with the appropriate bathymetry.
-#We will use the rectangular_mesh_generator target. This file uses bathymetry.hpp
-#to generate the necessary bathymetry evaluations.
-cd $DGSWEMV2_ROOT_/mesh_generators
-if [[ -f bathymetry.hpp ]]; then
-    mv bathymetry.hpp bathymetry.hpp.tmp
-fi
-cp $PARABOLIC_BOWL_DIR/parabolic_bowl_bathymetry.hpp bathymetry.hpp
-
-#Recompile the rectangular mesh generator with the new bathymetry
-cd $DGSWEMV2_BUILD_DIR_
-make rectangular_mesh_generator
-
-#and then generate the mesh as an input file
-cd $PARABOLIC_BOWL_DIR/input_files/
-$DGSWEMV2_BUILD_DIR_/mesh_generators/rectangular_mesh_generator mesh_generator_input.yml
-
-#This will generate 2 files in the input_files directory:
-# 1.) An ADCIRC-formatted fort.14 file called parabowl_040.14
-# 2.) A boundary conditions file parabowl_040.bcis
-# N.B. when all boundaries are land boundaries as is the case here, the *.bcis file
-#      is simply an empty file.
-
-###################################################################################
 echo "Running the Simulation"
 ###################################################################################
 
-#To run the simulation, similar to the mesh generation phase, we need to copy the
-#initial conditions, and recompile the dgswemv2 target.
+#To run the simulation, similar to the mesh generation phase, we need
+#to copy the initial conditions, and recompile the dgswemv2 target.
 cd $DGSWEMV2_ROOT_/source/problem/SWE/problem_function_files
 mv swe_initial_condition_functions.hpp swe_initial_condition_functions.hpp.tmp
 cp $PARABOLIC_BOWL_DIR/parabolic_bowl_initial_condition_functions.hpp swe_initial_condition_functions.hpp
+mv swe_true_solution_functions.hpp swe_true_solution_functions.hpp.tmp
+cp $PARABOLIC_BOWL_DIR/parabolic_bowl_true_solution_functions.hpp swe_true_solution_functions.hpp
+
+#compute L2Residual
+MAIN_DIR="$DGSWEMV2_ROOT_/source"
+cp ${MAIN_DIR}/dgswemv2-serial.cpp ${MAIN_DIR}/dgswemv2-serial.cpp.tmp
+sed -i.tmp '/return 0/i\
+simulation->ComputeL2Residual();' ${MAIN_DIR}/dgswemv2-serial.cpp
 
 #Now we compile the dgswemv2-serial target
 cd $DGSWEMV2_BUILD_DIR_
@@ -101,6 +87,8 @@ echo "Cleaning up"
 ###################################################################################
 cd $DGSWEMV2_ROOT_/source/problem/SWE/problem_function_files
 mv swe_initial_condition_functions.hpp.tmp swe_initial_condition_functions.hpp
+mv swe_true_solution_functions.hpp.tmp swe_true_solution_functions.hpp
+mv ${MAIN_DIR}/dgswemv2-serial.cpp.tmp ${MAIN_DIR}/dgswemv2-serial.cpp
 
 cd $DGSWEMV2_ROOT_/mesh_generators
 if [[ -f bathymetry.hpp.tmp ]]; then
