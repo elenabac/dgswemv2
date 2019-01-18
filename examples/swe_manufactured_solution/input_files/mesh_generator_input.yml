@@ -9,11 +9,11 @@
 # This input file is used to generate rectangle with diagonally opposite
 # vertices (x1,y1) and (x2,y2)
 
-x1: -1
-y1: -1
+x1: 40000
+y1: 10000
 
-x2: 1
-y2: 1
+x2: 83200
+y2: 53200
 
 # We then determine the number of element edges along each edge
 

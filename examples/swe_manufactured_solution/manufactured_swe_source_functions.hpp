@@ -12,17 +12,17 @@ inline StatVector<double, SWE::n_variables> source_q(const double t, const Point
     constexpr double y1 = -PI;
     constexpr double y2 = PI;
     */
-    constexpr double x1 = 40000;
-    constexpr double x2 = 150000;
-    constexpr double y1 = 10000;
-    constexpr double y2 = 55000;
+    constexpr double x1 = 40000.;
+    constexpr double x2 = 83200.;
+    constexpr double y1 = 10000.;
+    constexpr double y2 = 53200.;
     
-    constexpr double Ho = 2;
+    constexpr double Ho = 2.;
     constexpr double zo = 0.25;
     Utilities::ignore(Ho);
 
-    constexpr double tau = 3456;
-    constexpr double w   = 2*PI/tau;
+    constexpr double tau = 3456.;
+    constexpr double w   = 2*PI/43200.;
 
     double source_ze = 0.0;
 
