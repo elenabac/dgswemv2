@@ -288,6 +288,8 @@ enum LocalCoordLin : uchar { l1 = 0, l2 = 1, l3 = 2 };
 
 enum LocalCoordTri : uchar { z1 = 0, z2 = 1, z3 = 2 };
 
+enum LocalCurvCoord : uchar { s1 = 0, s2 = 1, s3 = 2 };
+
 enum LocalCoordQuad : uchar { n1 = 0, n2 = 1, n3 = 2 };
 
 enum VTKElementTypes : uchar { straight_triangle = 5 };
